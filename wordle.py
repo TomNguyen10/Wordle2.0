@@ -1,6 +1,7 @@
 import random
 import contextlib
 import nltk
+import requests
 from nltk.corpus import words
 from rich.console import Console
 from rich.theme import Theme
@@ -14,13 +15,73 @@ except LookupError:
 console = Console(width=40, theme=Theme({"warning": "red on yellow"}))
 
 
+def show_welcome_screen():
+    """Display a welcome screen with ASCII art."""
+    console.clear()
+    console.rule("[bold green]Welcome to Wordle![/bold green]")
+    console.print("""
+[bold cyan]
+  __        __   _                            _        
+  \ \      / /__| | ___ ___  _ __ ___   ___  | |_ ___  
+   \ \ /\ / / _ \ |/ __/ _ \| '_ ` _ \ / _ \ | __/ _ \ 
+    \ V  V /  __/ | (_| (_) | | | | | |  __/ | || (_) |
+     \_/\_/ \___|_|\___\___/|_| |_| |_|\___|  \__\___/ 
+[/bold cyan]
+""", justify="center")
+    console.print(
+        "Wordle is a simple word-guessing game. Try to guess the word in the fewest attempts possible!\n", justify="center")
+    console.input("[bold green]Press Enter to start the game![/bold green]")
+
+
+def show_progress_bar(current, total):
+    """Display a progress bar for the number of guesses."""
+    percentage = (current / total) * 100
+    bar_length = 30  # Length of the progress bar
+    filled_length = int(bar_length * current // total)
+    bar = "█" * filled_length + "-" * (bar_length - filled_length)
+    console.print(
+        f"[bold green]Guesses Used:[/] |{bar}| {current}/{total} ({percentage:.0f}%)", justify="center")
+
+
+def show_celebration():
+    """Display celebratory ASCII art for winning."""
+    console.print("""
+[bold green]
+██╗   ██╗ ██████╗ ██╗   ██╗███████╗██████╗ 
+██║   ██║██╔═══██╗██║   ██║██╔════╝██╔══██╗
+██║   ██║██║   ██║██║   ██║█████╗  ██████╔╝
+╚██╗ ██╔╝██║   ██║██║   ██║██╔══╝  ██╔═══╝ 
+ ╚████╔╝ ╚██████╔╝╚██████╔╝███████╗██║     
+  ╚═══╝   ╚═════╝  ╚═════╝ ╚══════╝╚═╝     
+[/bold green]
+""", justify="center")
+    console.print(
+        "[bold cyan]Congratulations! You guessed the word![/bold cyan]\n", justify="center")
+
+
+def show_consolation(word):
+    """Display a consolation message with ASCII art."""
+    console.print("""
+[bold red]
+   __     ______  _    _   _      ____   _____ 
+   \ \   / / __ \| |  | | | |    / __ \ / ____|
+    \ \_/ / |  | | |  | | | |   | |  | | (___  
+     \   /| |  | | |  | | | |   | |  | |\___ \ 
+      | | | |__| | |__| | | |___| |__| |____) |
+      |_|  \____/ \____/  |______\____/|_____/ 
+[/bold red]
+""", justify="center")
+    console.print(
+        f"[bold red]Better luck next time! The word was {word}.[/bold red]\n", justify="center")
+
+
 class WordleGame:
     def __init__(self):
         self.NUM_LETTERS = 5
         self.NUM_GUESSES = 6
         self.word = ""
         self.guesses = []
-        self.hint_used = False  # Track if hint has been used
+        self.hint_used = False
 
     def set_difficulty(self):
         """Set the difficulty level and adjust game parameters."""
@@ -76,7 +137,7 @@ class WordleGame:
     def use_hint(self):
         """Reveal one correct letter in its correct position."""
         for i, letter in enumerate(self.word):
-            if self.guesses[-1][i] == "_":  # Find the first unrevealed letter
+            if self.guesses[-1][i] == "_":
                 self.guesses[-1] = self.guesses[-1][:i] + \
                     letter + self.guesses[-1][i + 1:]
                 console.print(
@@ -104,7 +165,33 @@ class WordleGame:
             console.print("".join(styled_guess), justify="center")
         console.print("\n" + "".join(letter_status.values()), justify="center")
 
-    def game_over(self, guessed_correctly):
+    def refresh_page(self, headline):
+        """Clear the console and display a headline."""
+        console.clear()
+        console.rule(f"[bold blue]:leafy_green: {headline} :leafy_green:[/]\n")
+
+    def fetch_word_definition(self, word):
+        """
+        Fetch the definition of a word from DictionaryAPI.
+        """
+        try:
+            response = requests.get(
+                f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}")
+            if response.status_code == 200:
+                data = response.json()
+                meanings = data[0].get("meanings", [])
+                if not meanings:
+                    return "No definitions found."
+                definition = meanings[0]["definitions"][0]["definition"]
+                return definition
+            elif response.status_code == 404:
+                return "Word not found in the dictionary."
+            else:
+                return "Error fetching definition. Try again later."
+        except Exception as e:
+            return f"An error occurred: {e}"
+
+    def game_over(self, guessed_correctly, word):
         """Handle game-over logic."""
         self.refresh_page(headline="Game Over")
         self.show_guesses()
@@ -114,20 +201,19 @@ class WordleGame:
         else:
             console.print(
                 f"\n[bold white on red]Sorry, the word was {self.word}[/]")
-
-    def refresh_page(self, headline):
-        """Clear the console and display a headline."""
-        console.clear()
-        console.rule(f"[bold blue]:leafy_green: {headline} :leafy_green:[/]\n")
+        console.print("\nFetching word definition...")
+        definition = self.fetch_word_definition(word)
+        console.print(f"\n[bold blue]Definition of {word}:[/] {definition}")
 
     def play(self):
         """Run the main game loop."""
         while True:
+            show_welcome_screen()
             self.refresh_page("Wordle")
             self.set_difficulty()
             self.word = self.get_word()
             if not self.word:
-                continue  # Retry if word generation fails
+                continue
 
             self.guesses = ["_" * self.NUM_LETTERS] * self.NUM_GUESSES
             self.hint_used = False
@@ -143,7 +229,11 @@ class WordleGame:
                         guessed_correctly = True
                         break
 
-            self.game_over(guessed_correctly)
+            self.game_over(guessed_correctly, word=self.word)
+            if guessed_correctly:
+                show_celebration()
+            else:
+                show_consolation(word=self.word)
             play_again = console.input(
                 "\nDo you want to play again? (y/n): ").lower()
             if play_again != "y":
