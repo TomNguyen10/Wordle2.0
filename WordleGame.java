@@ -1,10 +1,15 @@
+import org.fusesource.jansi.Ansi;
+import org.fusesource.jansi.AnsiConsole;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URL;
+import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.fusesource.jansi.Ansi.Color.*;
 
 public class WordleGame {
     private int numLetters = 5;
@@ -15,8 +20,10 @@ public class WordleGame {
     private static final Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
+        AnsiConsole.systemInstall(); // Initialize Jansi
         WordleGame game = new WordleGame();
         game.play();
+        AnsiConsole.systemUninstall(); // Clean up Jansi
     }
 
     public void play() {
@@ -48,15 +55,22 @@ public class WordleGame {
 
     private void showWelcomeScreen() {
         clearConsole();
-        System.out.println("Welcome to Wordle!\n");
-        System.out.println("Wordle is a simple word-guessing game.");
-        System.out.println("Try to guess the word in the fewest attempts possible!\n");
+        System.out.println(Ansi.ansi()
+                .fgBright(GREEN)
+                .bold()
+                .a("Welcome to Wordle!\n")
+                .reset());
+        System.out.println(Ansi.ansi()
+                .fgBright(CYAN)
+                .a("Wordle is a simple word-guessing game.\n")
+                .a("Try to guess the word in the fewest attempts possible!\n")
+                .reset());
         System.out.print("Press Enter to start the game!");
         scanner.nextLine();
     }
 
     private void setDifficulty() {
-        System.out.println("\nSelect difficulty level:");
+        System.out.println(Ansi.ansi().fgBright(BLUE).a("\nSelect difficulty level:").reset());
         System.out.println("1. Easy (6 letters, 7 guesses)");
         System.out.println("2. Medium (5 letters, 6 guesses) [default]");
         System.out.println("3. Hard (4 letters, 5 guesses)");
@@ -82,7 +96,7 @@ public class WordleGame {
                 .filter(w -> w.length() == numLetters)
                 .collect(Collectors.toList());
         if (wordList.isEmpty()) {
-            System.out.println("No words available for " + numLetters + " letters. Please choose another difficulty.");
+            System.out.println(Ansi.ansi().fgBright(RED).a("No words available for " + numLetters + " letters. Please choose another difficulty.").reset());
             return null;
         }
         return wordList.get(new Random().nextInt(wordList.size())).toUpperCase();
@@ -94,18 +108,18 @@ public class WordleGame {
             String guess = scanner.nextLine().toUpperCase();
             if ("HINT".equals(guess)) {
                 if (hintUsed) {
-                    System.out.println("You have already used your hint for this game.");
+                    System.out.println(Ansi.ansi().fgBright(YELLOW).a("You have already used your hint for this game.").reset());
                 } else {
                     useHint();
                 }
                 continue;
             }
             if (previousGuesses.contains(guess)) {
-                System.out.println("You've already guessed " + guess + ".");
+                System.out.println(Ansi.ansi().fgBright(YELLOW).a("You've already guessed " + guess + ".").reset());
             } else if (guess.length() != numLetters) {
-                System.out.println("Your guess must be " + numLetters + " letters.");
+                System.out.println(Ansi.ansi().fgBright(YELLOW).a("Your guess must be " + numLetters + " letters.").reset());
             } else if (!guess.matches("[A-Z]+")) {
-                System.out.println("Invalid input: Only English letters are allowed.");
+                System.out.println(Ansi.ansi().fgBright(YELLOW).a("Invalid input: Only English letters are allowed.").reset());
             } else {
                 return guess;
             }
@@ -116,12 +130,12 @@ public class WordleGame {
         for (int i = 0; i < word.length(); i++) {
             if (guesses.get(guesses.size() - 1).charAt(i) == '_') {
                 char hintLetter = word.charAt(i);
-                System.out.println("Hint: The letter '" + hintLetter + "' is in position " + (i + 1));
+                System.out.println(Ansi.ansi().fgBright(BLUE).a("Hint: The letter '" + hintLetter + "' is in position " + (i + 1)).reset());
                 hintUsed = true;
                 return;
             }
         }
-        System.out.println("No hints available; you've already uncovered all positions!");
+        System.out.println(Ansi.ansi().fgBright(RED).a("No hints available; you've already uncovered all positions!").reset());
     }
 
     private void showGuesses() {
@@ -132,11 +146,11 @@ public class WordleGame {
                 char gChar = guess.charAt(i);
                 char wChar = word.charAt(i);
                 if (gChar == wChar) {
-                    styledGuess.append("[").append(gChar).append("]");
+                    styledGuess.append(Ansi.ansi().fgBright(GREEN).bold().a(gChar).reset());
                 } else if (word.contains(String.valueOf(gChar))) {
-                    styledGuess.append("(").append(gChar).append(")");
+                    styledGuess.append(Ansi.ansi().fgBright(YELLOW).bold().a(gChar).reset());
                 } else {
-                    styledGuess.append(gChar);
+                    styledGuess.append(Ansi.ansi().fg(BLACK).a(gChar).reset());
                 }
             }
             System.out.println(styledGuess);
@@ -147,21 +161,20 @@ public class WordleGame {
         refreshPage("Game Over");
         showGuesses();
         if (guessedCorrectly) {
-            System.out.println("Correct! The word was " + word);
+            System.out.println(Ansi.ansi().fgBright(GREEN).bold().a("Correct! The word was " + word).reset());
             showCelebration();
         } else {
-            System.out.println("Sorry, the word was " + word);
+            System.out.println(Ansi.ansi().fgBright(RED).bold().a("Sorry, the word was " + word).reset());
             showConsolation();
         }
         System.out.println("\nFetching word definition...");
         String definition = fetchWordDefinition(word);
-        System.out.println("Definition of " + word + ": " + definition);
+        System.out.println(Ansi.ansi().fgBright(CYAN).a("Definition of " + word + ": " + definition).reset());
     }
 
     private String fetchWordDefinition(String word) {
         try {
-            URI uri = new URI("https", "api.dictionaryapi.dev", "/api/v2/entries/en/" + word, null);
-            URL url = uri.toURL();
+            URL url = new URI("https://api.dictionaryapi.dev/api/v2/entries/en/" + word).toURL();
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
 
@@ -182,19 +195,19 @@ public class WordleGame {
 
     private void refreshPage(String headline) {
         clearConsole();
-        System.out.println("=== " + headline + " ===");
+        System.out.println(Ansi.ansi().fgBright(BLUE).bold().a("=== " + headline + " ===").reset());
     }
 
     private void showCelebration() {
-        System.out.println("\n🎉 Congratulations! 🎉");
+        System.out.println(Ansi.ansi().fgBright(GREEN).bold().a("\n🎉 Congratulations! 🎉").reset());
     }
 
     private void showConsolation() {
-        System.out.println("\nBetter luck next time!");
+        System.out.println(Ansi.ansi().fgBright(RED).bold().a("\nBetter luck next time!").reset());
     }
 
     private List<String> getEnglishWords() {
-        return Arrays.asList("apple", "happy", "beach", "other", "world"); 
+        return Arrays.asList("apple", "happy", "beach", "other", "world"); // Replace with an English word list.
     }
 
     private void clearConsole() {
