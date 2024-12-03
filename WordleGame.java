@@ -194,7 +194,7 @@ public class WordleGame {
     }
 
     private List<String> getEnglishWords() {
-        return Arrays.asList("apple", "happy", "beach", "other", "world"); // Replace with an English word list.
+        return Arrays.asList("apple", "happy", "beach", "other", "world"); 
     }
 
     private void clearConsole() {
