@@ -1,16 +1,10 @@
 import random
 import contextlib
-import nltk
 import requests
-from nltk.corpus import words
 from rich.console import Console
 from rich.theme import Theme
 from string import ascii_uppercase
 
-try:
-    words.words()
-except LookupError:
-    nltk.download("words")
 
 console = Console(width=40, theme=Theme({"warning": "red on yellow"}))
 
@@ -36,7 +30,7 @@ def show_welcome_screen():
 def show_progress_bar(current, total):
     """Display a progress bar for the number of guesses."""
     percentage = (current / total) * 100
-    bar_length = 30  # Length of the progress bar
+    bar_length = 30
     filled_length = int(bar_length * current // total)
     bar = "█" * filled_length + "-" * (bar_length - filled_length)
     console.print(
@@ -102,14 +96,25 @@ class WordleGame:
             self.NUM_GUESSES = 6
 
     def get_word(self):
-        """Fetch a random word of the correct length."""
-        word_list = [word.upper() for word in words.words() if len(
-            word) == self.NUM_LETTERS and word.isalpha()]
-        if not word_list:
-            console.print(f"No words available for {self.NUM_LETTERS} letters. Please choose another difficulty.",
-                          style="warning")
+        try:
+            with open("words.txt", "r", encoding="utf-8") as file:
+                word_list = [word.strip().upper() for word in file if len(
+                    word.strip()) == self.NUM_LETTERS and word.strip().isalpha()]
+
+            if not word_list:
+                console.print(f"No words available for {self.NUM_LETTERS} letters. Please choose another difficulty.",
+                              style="warning")
+                return None
+
+            return random.choice(word_list)
+        except FileNotFoundError:
+            console.print(
+                "The words file (words.txt) could not be found. Please ensure the file exists.", style="warning")
             return None
-        return random.choice(word_list)
+        except Exception as e:
+            console.print(
+                f"An error occurred while fetching words: {e}", style="warning")
+            return None
 
     def guess_word(self, previous_guesses):
         """Prompt the user to guess a word or use a hint."""

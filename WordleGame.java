@@ -2,9 +2,12 @@ import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.AnsiConsole;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -14,16 +17,17 @@ import static org.fusesource.jansi.Ansi.Color.*;
 public class WordleGame {
     private int numLetters = 5;
     private int numGuesses = 6;
+    private static final String WORD_LIST_FILE = "words.txt";
     private String word = "";
     private List<String> guesses = new ArrayList<>();
     private boolean hintUsed = false;
     private static final Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
-        AnsiConsole.systemInstall(); // Initialize Jansi
+        AnsiConsole.systemInstall();
         WordleGame game = new WordleGame();
         game.play();
-        AnsiConsole.systemUninstall(); // Clean up Jansi
+        AnsiConsole.systemUninstall();
     }
 
     public void play() {
@@ -42,6 +46,8 @@ public class WordleGame {
                 showGuesses();
                 String guess = guessWord(guesses.subList(0, attempt));
                 guesses.set(attempt, guess);
+                showProgressBar(attempt + 1, numGuesses);
+
                 if (guess.equals(word)) {
                     guessedCorrectly = true;
                     break;
@@ -62,8 +68,17 @@ public class WordleGame {
                 .reset());
         System.out.println(Ansi.ansi()
                 .fgBright(CYAN)
-                .a("Wordle is a simple word-guessing game.\n")
-                .a("Try to guess the word in the fewest attempts possible!\n")
+                .a("""
+                     __        __   _                            _        
+                     \\ \\      / /__| | ___ ___  _ __ ___   ___  | |_ ___  
+                      \\ \\ /\\ / / _ \\ |/ __/ _ \\| '_ ` _ \\ / _ \\ | __/ _ \\ 
+                       \\ V  V /  __/ | (_| (_) | | | | | |  __/ | || (_) |
+                        \\_/\\_/ \\___|_|\\___\\___/|_| |_| |_|\\___|  \\__\\___/ 
+                    """)
+                .reset());
+        System.out.println(Ansi.ansi()
+                .fgBright(CYAN)
+                .a("Wordle is a simple word-guessing game. Try to guess the word in the fewest attempts possible!\n")
                 .reset());
         System.out.print("Press Enter to start the game!");
         scanner.nextLine();
@@ -92,9 +107,10 @@ public class WordleGame {
     }
 
     private String getWord() {
-        List<String> wordList = getEnglishWords().stream()
+        List<String> wordList = getWordsFromFile().stream()
                 .filter(w -> w.length() == numLetters)
                 .collect(Collectors.toList());
+
         if (wordList.isEmpty()) {
             System.out.println(Ansi.ansi().fgBright(RED).a("No words available for " + numLetters + " letters. Please choose another difficulty.").reset());
             return null;
@@ -157,6 +173,24 @@ public class WordleGame {
         }
     }
 
+    private void showProgressBar(int current, int total) {
+        int barLength = 30;
+        int filledLength = (int) ((double) current / total * barLength);
+        StringBuilder bar = new StringBuilder();
+        for (int i = 0; i < barLength; i++) {
+            if (i < filledLength) {
+                bar.append("█");
+            } else {
+                bar.append("-");
+            }
+        }
+        System.out.println(Ansi.ansi()
+                .fgBright(GREEN)
+                .a(String.format("Guesses Used: |%s| %d/%d (%.0f%%)",
+                        bar, current, total, (double) current / total * 100))
+                .reset());
+    }
+
     private void gameOver(boolean guessedCorrectly) {
         refreshPage("Game Over");
         showGuesses();
@@ -199,19 +233,53 @@ public class WordleGame {
     }
 
     private void showCelebration() {
-        System.out.println(Ansi.ansi().fgBright(GREEN).bold().a("\n🎉 Congratulations! 🎉").reset());
+        System.out.println(Ansi.ansi()
+                .fgBright(GREEN)
+                .a("""
+                 ██╗   ██╗ ██████╗ ██╗   ██╗███████╗██████╗ 
+                 ██║   ██║██╔═══██╗██║   ██║██╔════╝██╔══██╗
+                 ██║   ██║██║   ██║██║   ██║█████╗  ██████╔╝
+                 ╚██╗ ██╔╝██║   ██║██║   ██║██╔══╝  ██╔═══╝ 
+                  ╚████╔╝ ╚██████╔╝╚██████╔╝███████╗██║     
+                   ╚═══╝   ╚═════╝  ╚═════╝ ╚══════╝╚═╝     
+                """)
+                .reset());
+        System.out.println(Ansi.ansi()
+                .fgBright(CYAN)
+                .a("🎉 Congratulations! You guessed the word! 🎉")
+                .reset());
     }
 
     private void showConsolation() {
-        System.out.println(Ansi.ansi().fgBright(RED).bold().a("\nBetter luck next time!").reset());
-    }
-
-    private List<String> getEnglishWords() {
-        return Arrays.asList("apple", "happy", "beach", "other", "world"); // Replace with an English word list.
+        System.out.println(Ansi.ansi()
+                .fgBright(RED)
+                .a("""
+                  __     ______  _    _   _      ____   _____ 
+                  \\ \\   / / __ \\| |  | | | |    / __ \\ / ____|
+                   \\ \\_/ / |  | | |  | | | |   | |  | | (___  
+                    \\   /| |  | | |  | | | |   | |  | |\\___ \\ 
+                     | | | |__| | |__| | | |___| |__| |____) |
+                     |_|  \\____/ \\____/  |______\\____/|_____/ 
+                """)
+                .reset());
+        System.out.println(Ansi.ansi()
+                .fgBright(RED)
+                .a("Better luck next time! The word was " + word + ".")
+                .reset());
     }
 
     private void clearConsole() {
         System.out.print("\033[H\033[2J");
         System.out.flush();
+    }
+
+    private List<String> getWordsFromFile() {
+        List<String> wordList = new ArrayList<>();
+        try {
+            wordList = Files.readAllLines(Paths.get(WORD_LIST_FILE));
+        } catch (IOException e) {
+            System.out.println(Ansi.ansi().fgBright(RED).a("Error reading the word list file.").reset());
+        }
+        return wordList;
     }
 }
